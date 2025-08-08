@@ -173,11 +173,11 @@ var sizeTable = map[string]uint64{
 }
 
 func numberToHuman(n uint64) string {
-	units := []string{"Kb", "Mb", "Gb", "Tb", "Eb"}
-	i := 0
+	units := []string{"b", "Kb", "Mb", "Gb", "Tb", "Eb"}
 	value := float64(n)
 
-	for value > KByte && i < len(units) {
+	i := 0
+	for ; value > KByte && i < len(units); i++ {
 		value /= float64(KByte)
 	}
 
@@ -248,7 +248,7 @@ func main() {
 
 	if len(files) < 1 || files[0].CompressedSize64 > splitSize {
 		fmt.Printf(
-			"can never fit %s (%s).\n",
+			"Can never fit %s (%s).\n",
 			files[0].Name,
 			numberToHuman(files[0].CompressedSize64))
 		os.Exit(1)

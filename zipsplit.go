@@ -52,7 +52,7 @@ func numberedFileNamer(template string) func() string {
 	}
 }
 
-func validNumberedFileNamer(template string) bool {
+func validTemplate(template string) bool {
 	namer := numberedFileNamer(template)
 	a := namer()
 	b := namer()
@@ -230,7 +230,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if !validNumberedFileNamer(*nameTemplate) {
+	if !validTemplate(*nameTemplate) {
 		err := fmt.Errorf("Please supply a valid template.")
 		fmt.Println(err.Error())
 		os.Exit(1)

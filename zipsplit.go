@@ -2,9 +2,9 @@ package main
 
 import (
 	"archive/zip"
+	"errors"
 	"flag"
 	"fmt"
-	"errors"
 	"log"
 	"os"
 	"sort"
@@ -119,19 +119,25 @@ func fit(files []*zip.FileHeader, config Config) ([]*Bucket, error) {
 		added := false
 
 		for _, bucket := range buckets {
-			// Account for the overhead a zipfile has;
-			// Magic numbers are header sizes.
-			// Name is counted twice:
-			// once for the local header and once for the central
-			// directory at the end of the zipfile.
-			totalSize := uint64(len(file.Name)) +
-				30 + 16 + 46 +
-				uint64(len(file.Name)) +
-				uint64(len(file.Comment)) +
-				uint64(len(file.Extra))
+			// Account for the overhead a zip64 file has;
+			// local file header is 45 bytes,
+			// central directory file header is 66 bytes
+			// so:
+			//     45 + filename size +
+			//     66 + filename size +
+			//     extra field size
+			//     comment size
+			// per file.
+			//
+			totalSize := uint64(45+66) +
+				uint64(len(file.Name))*2 +
+				uint64(len(file.Extra)) +
+				uint64(len(file.Comment))
 
 			totalSize += file.CompressedSize64
-			if bucket.size+totalSize <= config.splitSize-22 {
+
+			// The end of the central directory record is 30 bytes.
+			if bucket.size+totalSize <= config.splitSize-30 {
 				bucket.size += totalSize
 				bucket.files = append(bucket.files, file)
 				added = true
@@ -235,8 +241,8 @@ func main() {
 
 	config := Config{
 		sourceArchive: *sourceArchive,
-		nameTemplate: *nameTemplate,
-		splitSize: humanToNumber(*splitSizeString)}
+		nameTemplate:  *nameTemplate,
+		splitSize:     humanToNumber(*splitSizeString)}
 
 	files, err := getZipContents(config.sourceArchive)
 	if err != nil {

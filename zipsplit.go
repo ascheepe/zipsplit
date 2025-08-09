@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"flag"
 	"fmt"
+	"errors"
 	"log"
 	"os"
 	"sort"
@@ -41,23 +42,22 @@ func (a bySize) Less(i, j int) bool {
 
 // Return a function which increases the number used
 // for the format string each time it is called.
-func numberedFileNamer(template string) func() string {
-	var n int64
+func numberedFileNamer(template string) (func() string, error) {
+	// The provided template should change when provided
+	// with different numbers but not contain the error
+	// format string.
+	a := fmt.Sprintf(template, 0)
+	b := fmt.Sprintf(template, 1)
+	if a == b || strings.Contains(a, "%!") {
+		return nil, errors.New("Invalid template.")
+	}
 
-	n = 1
+	n := 1
 	return func() string {
 		name := fmt.Sprintf(template, n)
 		n = n + 1
 		return name
-	}
-}
-
-func validTemplate(template string) bool {
-	namer := numberedFileNamer(template)
-	a := namer()
-	b := namer()
-
-	return a != b && !strings.Contains(a, "%!")
+	}, nil
 }
 
 func getZipContents(zipfile string) ([]*zip.FileHeader, error) {
@@ -107,10 +107,13 @@ func (bucket *Bucket) makeZip(config Config) error {
 	return nil
 }
 
-func fit(files []*zip.FileHeader, config Config) []*Bucket {
+func fit(files []*zip.FileHeader, config Config) ([]*Bucket, error) {
 	var buckets []*Bucket
 
-	newZipName := numberedFileNamer(config.nameTemplate)
+	newZipName, err := numberedFileNamer(config.nameTemplate)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, file := range files {
 		added := false
@@ -144,7 +147,7 @@ func fit(files []*zip.FileHeader, config Config) []*Bucket {
 		}
 	}
 
-	return buckets
+	return buckets, nil
 }
 
 // byte sizes
@@ -230,18 +233,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	if !validTemplate(*nameTemplate) {
-		err := fmt.Errorf("Please supply a valid template.")
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	splitSize := humanToNumber(*splitSizeString)
-
 	config := Config{
 		sourceArchive: *sourceArchive,
 		nameTemplate: *nameTemplate,
-		splitSize: splitSize}
+		splitSize: humanToNumber(*splitSizeString)}
 
 	files, err := getZipContents(config.sourceArchive)
 	if err != nil {
@@ -249,7 +244,7 @@ func main() {
 	}
 	sort.Sort(sort.Reverse(bySize(files)))
 
-	if len(files) < 1 || files[0].CompressedSize64 > splitSize {
+	if len(files) < 1 || files[0].CompressedSize64 > config.splitSize {
 		fmt.Printf(
 			"Can never fit %s (%s).\n",
 			files[0].Name,
@@ -257,7 +252,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	buckets := fit(files, config)
+	buckets, err := fit(files, config)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+
 	for _, bucket := range buckets {
 		err := bucket.makeZip(config)
 		if err != nil {

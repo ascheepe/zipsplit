@@ -238,7 +238,10 @@ func main() {
 
 	splitSize := humanToNumber(*splitSizeString)
 
-	config := Config{*sourceArchive, *nameTemplate, splitSize}
+	config := Config{
+		sourceArchive: *sourceArchive,
+		nameTemplate: *nameTemplate,
+		splitSize: splitSize}
 
 	files, err := getZipContents(config.sourceArchive)
 	if err != nil {

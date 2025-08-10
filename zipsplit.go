@@ -118,25 +118,31 @@ func fit(files []*zip.FileHeader, config Config) ([]*Bucket, error) {
 	for _, file := range files {
 		added := false
 
+		// Account for the overhead a zip64 file has;
+		// local file header is 45 bytes,
+		// central directory file header is 66 bytes
+		// so:
+		//     45 + filename size +
+		//     66 + filename size +
+		//     extra field size
+		//     comment size
+		// per file.
+		//
+		totalSize := uint64(45+66) +
+			uint64(len(file.Name))*2 +
+			uint64(len(file.Extra)) +
+			uint64(len(file.Comment)) +
+			uint64(file.CompressedSize64)
+
+		// The end of the central directory record is 30 bytes.
+		if totalSize > config.splitSize-30 {
+			return nil, fmt.Errorf("Can never fit %s (%s).",
+				file.Name,
+				numberToHuman(file.CompressedSize64))
+		}
+
+
 		for _, bucket := range buckets {
-			// Account for the overhead a zip64 file has;
-			// local file header is 45 bytes,
-			// central directory file header is 66 bytes
-			// so:
-			//     45 + filename size +
-			//     66 + filename size +
-			//     extra field size
-			//     comment size
-			// per file.
-			//
-			totalSize := uint64(45+66) +
-				uint64(len(file.Name))*2 +
-				uint64(len(file.Extra)) +
-				uint64(len(file.Comment))
-
-			totalSize += file.CompressedSize64
-
-			// The end of the central directory record is 30 bytes.
 			if bucket.size+totalSize <= config.splitSize-30 {
 				bucket.size += totalSize
 				bucket.files = append(bucket.files, file)
@@ -249,14 +255,6 @@ func main() {
 		log.Fatal(err)
 	}
 	sort.Sort(sort.Reverse(bySize(files)))
-
-	if len(files) < 1 || files[0].CompressedSize64 > config.splitSize {
-		fmt.Printf(
-			"Can never fit %s (%s).\n",
-			files[0].Name,
-			numberToHuman(files[0].CompressedSize64))
-		os.Exit(1)
-	}
 
 	buckets, err := fit(files, config)
 	if err != nil {

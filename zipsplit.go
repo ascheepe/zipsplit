@@ -17,6 +17,7 @@ type Config struct {
 	sourceArchive string
 	nameTemplate  string
 	splitSize     uint64
+	verbose       bool
 }
 
 type Bucket struct {
@@ -89,6 +90,10 @@ func (bucket *Bucket) makeZip(config Config) error {
 	}
 	defer zipDestination.Close()
 
+	if config.verbose {
+		fmt.Printf("Creating %s..", bucket.filename)
+	}
+
 	w := zip.NewWriter(zipDestination)
 	defer w.Close()
 
@@ -102,6 +107,10 @@ func (bucket *Bucket) makeZip(config Config) error {
 				break
 			}
 		}
+	}
+
+	if config.verbose {
+		fmt.Println("done.")
 	}
 
 	return nil
@@ -239,6 +248,12 @@ func main() {
 		"out",
 		"out-%03d.zip",
 		"Output name template in printf format.")
+
+	verbose := flag.Bool(
+		"v",
+		false,
+		"Show some information about the process.")
+
 	flag.Parse()
 
 	if *sourceArchive == "" {
@@ -248,7 +263,8 @@ func main() {
 	config := Config{
 		sourceArchive: *sourceArchive,
 		nameTemplate:  *nameTemplate,
-		splitSize:     humanToNumber(*splitSizeString)}
+		splitSize:     humanToNumber(*splitSizeString),
+		verbose:       *verbose}
 
 	files, err := getZipContents(config.sourceArchive)
 	if err != nil {
@@ -259,6 +275,10 @@ func main() {
 	buckets, err := fit(files, config)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if config.verbose {
+		fmt.Printf("Splitting takes %d files.\n", len(buckets))
 	}
 
 	for _, bucket := range buckets {

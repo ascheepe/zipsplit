@@ -118,8 +118,8 @@ func (bucket *Bucket) makeZip(config Config) error {
 
 // byte sizes
 const (
-	Byte = 1 << (iota * 10)
-	KByte
+	_ = iota
+	KByte = 1 << (iota * 10)
 	MByte
 	GByte
 	TByte
@@ -127,8 +127,8 @@ const (
 )
 
 var sizeTable = map[string]uint64{
-	"":   Byte,
-	"b":  Byte,
+	"":   1,
+	"b":  1,
 	"k":  KByte,
 	"kb": KByte,
 	"m":  MByte,
@@ -142,7 +142,7 @@ var sizeTable = map[string]uint64{
 }
 
 func numberToHuman(n uint64) string {
-	units := []string{"b", "Kb", "Mb", "Gb", "Tb", "Eb"}
+	units := []string{"", "Kb", "Mb", "Gb", "Tb", "Eb"}
 	value := float64(n)
 
 	i := 0
@@ -203,7 +203,7 @@ func fit(files []*zip.FileHeader, config Config) ([]*Bucket, error) {
 			uint64(file.CompressedSize64)
 
 		// The end of the central directory record is 30 bytes.
-		if totalSize > config.splitSize-30 {
+		if config.splitSize <= 30 || totalSize > config.splitSize-30 {
 			return nil, fmt.Errorf("Can never fit %s (%s).",
 				file.Name,
 				numberToHuman(file.CompressedSize64))

@@ -145,22 +145,21 @@ func numberToHuman(n uint64) string {
 }
 
 func humanToNumber(s string) uint64 {
-	var splitPoint uint64
+	var p uint64
 
-	splitPoint = 0
+	p = 0
 	for _, r := range s {
 		if !unicode.IsDigit(r) {
 			break
 		}
-		splitPoint++
+		p++
 	}
-	numberString := s[:splitPoint]
-	number, err := strconv.ParseUint(numberString, 10, 64)
+	number, err := strconv.ParseUint(s[:p], 10, 64)
 	if err != nil {
 		return 0
 	}
 
-	suffix := strings.ToLower(strings.TrimSpace(s[splitPoint:]))
+	suffix := strings.ToLower(strings.TrimSpace(s[p:]))
 	factor := sizeTable[suffix]
 	number *= factor
 

@@ -107,61 +107,6 @@ func (bucket *Bucket) makeZip(config Config) error {
 	return nil
 }
 
-func fit(files []*zip.FileHeader, config Config) ([]*Bucket, error) {
-	var buckets []*Bucket
-
-	newZipName, err := numberedFileNamer(config.nameTemplate)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, file := range files {
-		added := false
-
-		// Account for the overhead a zip64 file has;
-		// local file header is 45 bytes,
-		// central directory file header is 66 bytes
-		// so:
-		//     45 + filename size +
-		//     66 + filename size +
-		//     extra field size
-		//     comment size
-		// per file.
-		//
-		totalSize := uint64(45+66) +
-			uint64(len(file.Name))*2 +
-			uint64(len(file.Extra)) +
-			uint64(len(file.Comment)) +
-			uint64(file.CompressedSize64)
-
-		// The end of the central directory record is 30 bytes.
-		if totalSize > config.splitSize-30 {
-			return nil, fmt.Errorf("Can never fit %s (%s).",
-				file.Name,
-				numberToHuman(file.CompressedSize64))
-		}
-
-
-		for _, bucket := range buckets {
-			if bucket.size+totalSize <= config.splitSize-30 {
-				bucket.size += totalSize
-				bucket.files = append(bucket.files, file)
-				added = true
-				break
-			}
-		}
-
-		if !added {
-			buckets = append(buckets, &Bucket{
-				filename: newZipName(),
-				size:     file.CompressedSize64,
-				files:    []*zip.FileHeader{file}})
-		}
-	}
-
-	return buckets, nil
-}
-
 // byte sizes
 const (
 	Byte = 1 << (iota * 10)
@@ -220,6 +165,60 @@ func humanToNumber(s string) uint64 {
 	number *= factor
 
 	return number
+}
+
+func fit(files []*zip.FileHeader, config Config) ([]*Bucket, error) {
+	var buckets []*Bucket
+
+	newZipName, err := numberedFileNamer(config.nameTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, file := range files {
+		added := false
+
+		// Account for the overhead a zip64 file has;
+		// local file header is 45 bytes,
+		// central directory file header is 66 bytes
+		// so:
+		//     45 + filename size +
+		//     66 + filename size +
+		//     extra field size
+		//     comment size
+		// per file.
+		//
+		totalSize := uint64(45+66) +
+			uint64(len(file.Name))*2 +
+			uint64(len(file.Extra)) +
+			uint64(len(file.Comment)) +
+			uint64(file.CompressedSize64)
+
+		// The end of the central directory record is 30 bytes.
+		if totalSize > config.splitSize-30 {
+			return nil, fmt.Errorf("Can never fit %s (%s).",
+				file.Name,
+				numberToHuman(file.CompressedSize64))
+		}
+
+		for _, bucket := range buckets {
+			if bucket.size+totalSize <= config.splitSize-30 {
+				bucket.size += totalSize
+				bucket.files = append(bucket.files, file)
+				added = true
+				break
+			}
+		}
+
+		if !added {
+			buckets = append(buckets, &Bucket{
+				filename: newZipName(),
+				size:     file.CompressedSize64,
+				files:    []*zip.FileHeader{file}})
+		}
+	}
+
+	return buckets, nil
 }
 
 func main() {

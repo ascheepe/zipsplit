@@ -222,6 +222,10 @@ func fit(files []*zip.FileHeader, config Config) ([]*Bucket, error) {
 }
 
 func main() {
+	log.SetPrefix("zipsplit: ")
+	// Disable timestamps
+	log.SetFlags(0)
+
 	sourceArchive := flag.String(
 		"in",
 		"",
@@ -239,9 +243,7 @@ func main() {
 	flag.Parse()
 
 	if *sourceArchive == "" {
-		err := fmt.Errorf("Please supply an input archive.")
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatal(errors.New("Please supply an input archive."))
 	}
 
 	config := Config{
@@ -257,8 +259,7 @@ func main() {
 
 	buckets, err := fit(files, config)
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	for _, bucket := range buckets {
